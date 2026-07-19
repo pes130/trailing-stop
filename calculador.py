@@ -1,10 +1,54 @@
 import logging
 from database import get_session
 from models import Activo
+import requests
+import json
+import os
+from dotenv import load_dotenv
 
 # Configuración de logs
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("Agente_Calculador")
+# Cargamos las variables secretas al arrancar el script
+load_dotenv()
+
+def enviar_alerta_telegram(alertas):
+    """
+    Envía un mensaje directo a Telegram usando la API oficial.
+    """
+    if not alertas:
+        return
+
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+    if not bot_token or not chat_id:
+        logger.error("Faltan credenciales de Telegram en el archivo .env")
+        return
+
+    logger.info("Enviando alerta directa a Telegram...")
+    
+    # Construimos el mensaje con un poco de formato
+    mensaje_texto = "🚨 *ALERTA DE TRAILING STOP* 🚨\n\n"
+    for alerta in alertas:
+         mensaje_texto += f"📉 *{alerta['nombre']}* ({alerta['ticker']})\n"
+         mensaje_texto += f"• Precio Actual: `{alerta['precio_actual']}`\n"
+         mensaje_texto += f"• Stop Loss: `{alerta['stop_price']}`\n"
+         mensaje_texto += f"• Caída desde máximo: `{alerta['caida_desde_maximo']}%`\n\n"
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": mensaje_texto,
+        "parse_mode": "Markdown"
+    }
+
+    try:
+        respuesta = requests.post(url, json=payload, timeout=15)
+        respuesta.raise_for_status()
+        logger.info("Mensaje de Telegram enviado con éxito.")
+    except Exception as e:
+        logger.error(f"Error al enviar mensaje por Telegram: {e}")
 
 def evaluar_trailing_stops():
     logger.info("Iniciando evaluación de Trailing Stops...")
@@ -46,6 +90,12 @@ def evaluar_trailing_stops():
     else:
         logger.info(f"Evaluación finalizada. Se han detectado {len(alertas_generadas)} alertas críticas.")
     
+    if not alertas_generadas:
+        logger.info("Evaluación finalizada. Ningún activo ha tocado su stop loss.")
+    else:
+        logger.info(f"Evaluación finalizada. Se han detectado {len(alertas_generadas)} alertas críticas.")
+        enviar_alerta_telegram(alertas_generadas)
+
     return alertas_generadas
 
 if __name__ == '__main__':
