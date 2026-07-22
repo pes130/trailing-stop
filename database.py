@@ -6,6 +6,7 @@ import logging
 import os
 from models import Base
 
+
 # Configuración de logging 
 logging.basicConfig(
     level=logging.INFO, 

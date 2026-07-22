@@ -55,7 +55,7 @@ def evaluar_trailing_stops():
     alertas_generadas = []
 
     with get_session() as session:
-        activos = session.query(Activo).all()
+        activos = session.query(Activo).filter_by(activa=True).all()
 
         for activo in activos:
             seguimiento = activo.seguimiento

@@ -55,7 +55,7 @@ def ejecutar_scraper():
     logger.info("Iniciando ronda de web scraping (HTTP/2)...")
     
     with get_session() as db_session:
-        activos = db_session.query(Activo).all()
+        activos = db_session.query(Activo).filter_by(activa=True).all()
         
         if not activos:
             logger.info("No hay activos en la base de datos para escanear.")
@@ -84,6 +84,9 @@ def ejecutar_scraper():
                 seguimiento.trailing_stop_price = nuevo_stop
                 logger.info(f"Stop loss actualizado a: {nuevo_stop:.2f}")
 
+            if seguimiento.max_historico is None or high > seguimiento.max_historico:
+                seguimiento.max_historico = high
+                logger.info(f"¡NUEVO MÁXIMO HISTÓRICO para {activo.nombre}!: {high}")
             # --- PAUSA ALEATORIA ---
             pausa = random.uniform(5, 10)
             logger.debug(f"Pausa orgánica de {pausa:.2f} segundos...")
