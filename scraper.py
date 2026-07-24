@@ -5,6 +5,7 @@ import logging
 from database import get_session
 from models import Activo
 import random
+from notificador import enviar_alerta_telegram
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("Scraper_Tradegate")
@@ -15,6 +16,22 @@ def limpiar_precio(precio_str):
         return float(precio_str.replace(' ', ''))
     except ValueError:
         return None
+
+def construir_mensaje_nuevo_maximo(datos):
+    mensaje_texto =""
+    mensaje_texto += f"📈 *{datos['nombre']}* ({datos['ticker']})\n"
+    mensaje_texto += f"• Máx. anterior: {datos['max_anterior']}\n"
+    mensaje_texto += f"• Nuevo máx.: {datos['max_actual']}\n"
+    mensaje_texto += f"\n"
+    return mensaje_texto
+
+def construir_mensaje_nuevo_stop(datos):
+    mensaje_texto =""
+    mensaje_texto += f"📈 *{datos['nombre']}* ({datos['ticker']})\n"
+    mensaje_texto += f"• Stop anterior: {datos['stop_anterior']}\n"
+    mensaje_texto += f"• Nuevo stop: {datos['stop_actual']}\n"
+    mensaje_texto += f"\n"
+    return mensaje_texto
 
 def obtener_datos_tradegate(isin):
     # Forzamos el dominio principal que sabemos que resuelve bien en tu SO
@@ -53,7 +70,9 @@ def obtener_datos_tradegate(isin):
 
 def ejecutar_scraper():
     logger.info("Iniciando ronda de web scraping (HTTP/2)...")
-    
+    alertas_nuevos_stop = []
+    alertas_nuevos_max = []
+
     with get_session() as db_session:
         activos = db_session.query(Activo).filter_by(activa=True).all()
         
@@ -77,20 +96,46 @@ def ejecutar_scraper():
             logger.info(f"[{activo.nombre}] Precio actual (Last): {last}")
 
             if high > seguimiento.max_registrado:
+
+                
                 logger.info(f"¡NUEVO MÁXIMO para {activo.nombre}! Anterior: {seguimiento.max_registrado} -> Nuevo: {high}")
                 seguimiento.max_registrado = high
-                
+                old_stop = seguimiento.trailing_stop_price
                 nuevo_stop = high * (1 - seguimiento.porcentaje_stop)
                 seguimiento.trailing_stop_price = nuevo_stop
                 logger.info(f"Stop loss actualizado a: {nuevo_stop:.2f}")
+                alerta_nuevo_stop = construir_mensaje_nuevo_stop({
+                    "ticker": activo.ticker,
+                    "nombre": activo.nombre,
+                    "stop_anterior": round(old_stop, 2) if old_stop else 0,
+                    "stop_actual": round(nuevo_stop, 2)
+                })
+                alertas_nuevos_stop.append(alerta_nuevo_stop)
 
             if seguimiento.max_historico is None or high > seguimiento.max_historico:
+                old_max = seguimiento.max_historico
                 seguimiento.max_historico = high
                 logger.info(f"¡NUEVO MÁXIMO HISTÓRICO para {activo.nombre}!: {high}")
+                alerta_nuevo_max = construir_mensaje_nuevo_maximo({
+                    "ticker": activo.ticker,
+                    "nombre": activo.nombre,
+                    "max_anterior": old_max if old_max else 0,
+                    "max_actual": high
+                })
+                alertas_nuevos_max.append(alerta_nuevo_max)
+            
             # --- PAUSA ALEATORIA ---
             pausa = random.uniform(5, 10)
             logger.debug(f"Pausa orgánica de {pausa:.2f} segundos...")
             time.sleep(pausa)
+        db_session.commit()
+    if alertas_nuevos_stop:
+        alertas_nuevos_stop.insert(0, "🚨 *TRAILING STOPS ACTUALIZADOS* 🚨\n\n")
+        enviar_alerta_telegram(alertas_nuevos_stop)
+
+    if alertas_nuevos_max:
+        alertas_nuevos_max.insert(0, "🚀 *MÁXIMOS HISTÓRICOS SUPERADOS* 🚀\n\n")
+        enviar_alerta_telegram(alertas_nuevos_max)
 
     logger.info("Ronda de scraping finalizada con éxito.")
 

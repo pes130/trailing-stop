@@ -49,3 +49,26 @@ def obtener_cartera(db: Session = Depends(get_db)):
         })
         
     return {"activos": resultado}
+
+
+@app.get("/api/stops", summary="Obtener el listado de stops de mis activos")
+def obtener_stops(db: Session = Depends(get_db)):
+    activos = db.query(Activo).filter_by(activa=True).all()
+    
+    if not activos:
+        raise HTTPException(status_code=404, detail="No hay activos en la cartera.")
+    
+    resultado = []
+    for activo in activos:
+        # Extraemos solo lo necesario para el Agente
+        seguimiento = activo.seguimiento
+        precio_actual = seguimiento.ultimo_precio_leido if seguimiento else None
+        stop_loss = seguimiento.trailing_stop_price if seguimiento else None
+        
+        resultado.append({
+            "ticker": activo.ticker,
+            "nombre": activo.nombre,
+            "stop_loss": stop_loss
+        })
+        
+    return {"activos": resultado}
