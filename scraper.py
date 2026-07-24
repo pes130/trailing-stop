@@ -95,12 +95,14 @@ def ejecutar_scraper():
             seguimiento.ultimo_precio_leido = last
             logger.info(f"[{activo.nombre}] Precio actual (Last): {last}")
 
-            if high > seguimiento.max_registrado:
+            max_registrado_actual = float(seguimiento.max_registrado) if seguimiento.max_registrado is not None else 0.0
+
+            if high > max_registrado_actual:
 
                 
                 logger.info(f"¡NUEVO MÁXIMO para {activo.nombre}! Anterior: {seguimiento.max_registrado} -> Nuevo: {high}")
                 seguimiento.max_registrado = high
-                old_stop = seguimiento.trailing_stop_price
+                old_stop = float(seguimiento.trailing_stop_price) if seguimiento.trailing_stop_price is not None else 0.0
                 nuevo_stop = high * (1 - seguimiento.porcentaje_stop)
                 seguimiento.trailing_stop_price = nuevo_stop
                 logger.info(f"Stop loss actualizado a: {nuevo_stop:.2f}")
@@ -112,14 +114,15 @@ def ejecutar_scraper():
                 })
                 alertas_nuevos_stop.append(alerta_nuevo_stop)
 
-            if seguimiento.max_historico is None or high > seguimiento.max_historico:
-                old_max = seguimiento.max_historico
+            max_historico_actual = float(seguimiento.max_historico) if seguimiento.max_historico is not None else 0.0
+            if seguimiento.max_historico is None or high > max_historico_actual:
+                old_max = max_historico_actual
                 seguimiento.max_historico = high
                 logger.info(f"¡NUEVO MÁXIMO HISTÓRICO para {activo.nombre}!: {high}")
                 alerta_nuevo_max = construir_mensaje_nuevo_maximo({
                     "ticker": activo.ticker,
                     "nombre": activo.nombre,
-                    "max_anterior": old_max if old_max else 0,
+                    "max_anterior": round(old_max,2),
                     "max_actual": high
                 })
                 alertas_nuevos_max.append(alerta_nuevo_max)

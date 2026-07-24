@@ -1,0 +1,30 @@
+# Entornos virtuales
+venv/
+env/
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Bases de datos (¡Contiene tus datos financieros reales!)
+*.db
+*.sqlite
+*.sqlite3
+trailing_stop.db
+
+# Archivos de datos y hojas de cálculo (¡Tu cartera personal!)
+activos.csv
+activos.ods
+*.csv
+*.ods
+*.xlsx
+
+# Archivos temporales del sistema y editores (LibreOffice/Excel)
+.~lock.*
+.vscode/
+.DS_Store
+
+# Variables de entorno (Por si en el futuro añades claves de APIs)
+.env
